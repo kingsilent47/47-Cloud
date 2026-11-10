@@ -7,25 +7,13 @@ const quickUploadBtn = document.getElementById('quick-upload');
 const searchInput = document.getElementById('search-input');
 const sortSelect = document.getElementById('sort-select');
 const currentViewTitle = document.getElementById('current-view-title');
+const contextMenu = document.getElementById('context-menu');
 
 let currentView = 'all';
 let currentSort = 'date-desc';
 let currentFilter = 'all';
 let allFilesCache = [];
-
-// --- Favorites Logic (LocalStorage) ---
-const getFavorites = () => JSON.parse(localStorage.getItem('47cloud_favorites') || '[]');
-const toggleFavorite = (fileName) => {
-    let favorites = getFavorites();
-    if (favorites.includes(fileName)) {
-        favorites = favorites.filter(f => f !== fileName);
-    } else {
-        favorites.push(fileName);
-    }
-    localStorage.setItem('47cloud_favorites', JSON.stringify(favorites));
-    renderFilteredFiles();
-};
-window.toggleFavorite = toggleFavorite; // Expose to HTML onclick
+let selectedFileName = null; // Tracks the file right-clicked
 
 export function initStorageEvents() {
     uploadBtn.addEventListener('click', () => fileInput.click());
@@ -50,18 +38,10 @@ export function initStorageEvents() {
         fileInput.value = '';
     });
 
-    if (searchInput) {
-        searchInput.addEventListener('input', () => renderFilteredFiles());
-    }
+    if (searchInput) searchInput.addEventListener('input', () => renderFilteredFiles());
+    if (sortSelect) sortSelect.addEventListener('change', (e) => { currentSort = e.target.value; renderFilteredFiles(); });
 
-    if (sortSelect) {
-        sortSelect.addEventListener('change', (e) => {
-            currentSort = e.target.value;
-            renderFilteredFiles();
-        });
-    }
-
-    // Handle Filter Tabs
+    // Filter Tabs Logic
     const filterBtns = document.querySelectorAll('.filter-btn');
     filterBtns.forEach(btn => {
         btn.addEventListener('click', (e) => {
@@ -72,7 +52,7 @@ export function initStorageEvents() {
         });
     });
 
-    // Handle Sidebar Navigation
+    // Sidebar Navigation Logic
     const navItems = document.querySelectorAll('.nav-item');
     navItems.forEach(item => {
         item.addEventListener('click', (e) => {
@@ -90,17 +70,50 @@ export function initStorageEvents() {
         });
     });
 
-    // Event delegation for table actions (Download, Delete, Favorite)
+    // --- CONTEXT MENU LOGIC ---
+    // 1. Intercept Right-Click on Table Rows
+    ui.fileList.addEventListener('contextmenu', (e) => {
+        const row = e.target.closest('tr');
+        if (!row) return;
+        
+        e.preventDefault(); // Stop default browser menu
+        selectedFileName = row.querySelector('td:first-child').textContent.trim();
+        
+        // Position menu
+        contextMenu.style.left = `${e.clientX}px`;
+        contextMenu.style.top = `${e.clientY}px`;
+        contextMenu.classList.remove('hidden');
+    });
+
+    // 2. Hide menu on outside click
+    document.addEventListener('click', (e) => {
+        if (!contextMenu.contains(e.target)) {
+            contextMenu.classList.add('hidden');
+        }
+    });
+
+    // 3. Handle Context Menu Actions
+    contextMenu.addEventListener('click', async (e) => {
+        const btn = e.target.closest('button');
+        if (!btn) return;
+        
+        const action = btn.dataset.action;
+        contextMenu.classList.add('hidden');
+
+        if (action === 'download') await downloadFile(selectedFileName);
+        else if (action === 'delete') await deleteFile(selectedFileName);
+        else if (action === 'share') await shareFile(selectedFileName);
+        else if (action === 'rename') await renameFile(selectedFileName);
+    });
+
+    // Standard Left-Click Actions (Fallback)
     ui.fileList.addEventListener('click', async (e) => {
         const target = e.target.closest('button');
         if (!target) return;
-        
         const action = target.dataset.action;
         const fileName = target.dataset.name;
-
         if (action === 'download') await downloadFile(fileName);
         else if (action === 'delete') await deleteFile(fileName);
-        else if (action === 'favorite') toggleFavorite(fileName);
     });
 }
 
@@ -138,16 +151,10 @@ function sortFiles(files) {
 function renderFilteredFiles() {
     let filesToShow = [...allFilesCache];
     const searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
-    const favorites = getFavorites();
 
-    // 1. Filter by View (Favorites/Shared)
-    if (currentView === 'favorites') {
-        filesToShow = filesToShow.filter(file => favorites.includes(file.name));
-    } else if (currentView === 'shared') {
-        filesToShow = []; 
-    }
+    if (currentView === 'favorites') filesToShow = []; 
+    else if (currentView === 'shared') filesToShow = [];
 
-    // 2. Filter by Tab (Documents, Images, etc.)
     if (currentFilter !== 'all') {
         filesToShow = filesToShow.filter(file => {
             const ext = file.name.split('.').pop().toLowerCase();
@@ -159,16 +166,10 @@ function renderFilteredFiles() {
         });
     }
 
-    // 3. Filter by Search
-    if (searchTerm) {
-        filesToShow = filesToShow.filter(file => file.name.toLowerCase().includes(searchTerm));
-    }
+    if (searchTerm) filesToShow = filesToShow.filter(file => file.name.toLowerCase().includes(searchTerm));
 
-    // 4. Sort
     filesToShow = sortFiles(filesToShow);
-    
-    // 5. Render
-    ui.renderFiles(filesToShow, favorites);
+    ui.renderFiles(filesToShow);
     
     const countEl = document.getElementById('file-count');
     if (countEl) countEl.textContent = `${filesToShow.length} files`;
@@ -210,14 +211,51 @@ async function downloadFile(fileName) {
 }
 
 async function deleteFile(fileName) {
-    if (!confirm('Are you sure you want to delete this file?')) return;
+    if (!confirm(`Are you sure you want to delete ${fileName}?`)) return;
     const { data: { user } } = await db.auth.getUser();
     const filePath = `${user.id}/${fileName}`;
     const { error } = await db.storage.from(BUCKET_NAME).remove([filePath]);
-    if (!error) {
-        // Also remove from favorites if it was favorited
-        let favorites = getFavorites().filter(f => f !== fileName);
-        localStorage.setItem('47cloud_favorites', JSON.stringify(favorites));
+    if (!error) loadFiles();
+}
+
+async function shareFile(fileName) {
+    const { data: { user } } = await db.auth.getUser();
+    const filePath = `${user.id}/${fileName}`;
+    const { data } = db.storage.from(BUCKET_NAME).getPublicUrl(filePath);
+    
+    try {
+        await navigator.clipboard.writeText(data.publicUrl);
+        ui.showUploadStatus('Link copied to clipboard!');
+        setTimeout(() => ui.showUploadStatus(''), 3000);
+    } catch (err) {
+        ui.showUploadStatus('Failed to copy link.');
+    }
+}
+
+async function renameFile(oldName) {
+    const newName = prompt('Enter new file name:', oldName);
+    if (!newName || newName === oldName) return;
+
+    const { data: { user } } = await db.auth.getUser();
+    const oldPath = `${user.id}/${oldName}`;
+    const newPath = `${user.id}/${newName}`;
+
+    // Supabase doesn't have a direct "rename", so we copy then delete
+    const { data: fileData } = await db.storage.from(BUCKET_NAME).download(oldPath);
+    if (!fileData) {
+        ui.showUploadStatus('Error fetching file for rename.');
+        return;
+    }
+
+    const { error: uploadError } = await db.storage.from(BUCKET_NAME).upload(newPath, fileData, { upsert: true });
+    if (uploadError) {
+        ui.showUploadStatus(`Rename error: ${uploadError.message}`);
+        return;
+    }
+
+    const { error: deleteError } = await db.storage.from(BUCKET_NAME).remove([oldPath]);
+    if (!deleteError) {
+        ui.showUploadStatus('File renamed successfully.');
         loadFiles();
     }
 }
