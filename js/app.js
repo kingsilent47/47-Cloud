@@ -60,3 +60,46 @@ document.addEventListener('DOMContentLoaded', async () => {
                 passwordMessage.style.color = '#dc2626';
             } else {
                 passwordMessage.textContent = 'Password updated successfully.';
+                passwordMessage.style.color = '#16a34a';
+                passwordForm.reset();
+            }
+        });
+    }
+
+    // Mobile Menu Toggle Logic
+    const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
+    const sidebar = document.querySelector('.sidebar');
+    const sidebarOverlay = document.getElementById('sidebar-overlay');
+
+    if (mobileMenuToggle && sidebar) {
+        mobileMenuToggle.addEventListener('click', () => {
+            sidebar.classList.toggle('mobile-open');
+            if (sidebarOverlay) sidebarOverlay.classList.toggle('active');
+        });
+    }
+
+    if (sidebarOverlay && sidebar) {
+        sidebarOverlay.addEventListener('click', () => {
+            sidebar.classList.remove('mobile-open');
+            sidebarOverlay.classList.remove('active');
+        });
+    }
+
+    const navItems = document.querySelectorAll('.sidebar-nav .nav-item');
+    navItems.forEach(item => {
+        item.addEventListener('click', () => {
+            if (window.innerWidth <= 768) {
+                sidebar.classList.remove('mobile-open');
+                if (sidebarOverlay) sidebarOverlay.classList.remove('active');
+            }
+        });
+    });
+});
+
+async function loadUserSettings() {
+    const { data: { user } } = await db.auth.getUser();
+    const emailInput = document.getElementById('settings-email');
+    if (user && emailInput) {
+        emailInput.value = user.email;
+    }
+}
