@@ -1,5 +1,6 @@
 import { db, BUCKET_NAME } from './config.js';
 import { ui } from './ui.js';
+import { notifications } from './notifications.js';
 
 const fileInput = document.getElementById('file-input');
 const uploadBtn = document.getElementById('upload-btn');
@@ -13,9 +14,12 @@ let currentView = 'all';
 let currentSort = 'date-desc';
 let currentFilter = 'all';
 let allFilesCache = [];
-let selectedFileName = null; // Tracks the file right-clicked
+let selectedFileName = null;
+let sharedFilesCache = [];
 
 export function initStorageEvents() {
+    notifications.init();
+
     uploadBtn.addEventListener('click', () => fileInput.click());
     if (quickUploadBtn) quickUploadBtn.addEventListener('click', () => fileInput.click());
 
@@ -23,16 +27,18 @@ export function initStorageEvents() {
         const file = fileInput.files[0];
         if (!file) return;
 
-        ui.showUploadStatus('Uploading...');
+        notifications.showLoading(`Uploading ${file.name}...`);
         const { data: { user } } = await db.auth.getUser();
         const filePath = `${user.id}/${file.name}`;
 
         const { error } = await db.storage.from(BUCKET_NAME).upload(filePath, file, { upsert: true });
         
+        notifications.hideLoading();
+        
         if (error) {
-            ui.showUploadStatus(`Error: ${error.message}`);
+            notifications.add(`Failed to upload ${file.name}: ${error.message}`, 'error');
         } else {
-            ui.showUploadStatus('Upload complete.');
+            notifications.add(`${file.name} uploaded successfully.`, 'success');
             loadFiles();
         }
         fileInput.value = '';
@@ -41,7 +47,6 @@ export function initStorageEvents() {
     if (searchInput) searchInput.addEventListener('input', () => renderFilteredFiles());
     if (sortSelect) sortSelect.addEventListener('change', (e) => { currentSort = e.target.value; renderFilteredFiles(); });
 
-    // Filter Tabs Logic
     const filterBtns = document.querySelectorAll('.filter-btn');
     filterBtns.forEach(btn => {
         btn.addEventListener('click', (e) => {
@@ -52,51 +57,47 @@ export function initStorageEvents() {
         });
     });
 
-    // Sidebar Navigation Logic
     const navItems = document.querySelectorAll('.nav-item');
     navItems.forEach(item => {
-        item.addEventListener('click', (e) => {
+        item.addEventListener('click', async (e) => {
             e.preventDefault();
             const view = item.dataset.view;
             navItems.forEach(nav => nav.classList.remove('active'));
             item.classList.add('active');
             currentView = view;
             
-            if (view === 'all' || view === 'files') currentViewTitle.textContent = 'All Files';
-            else if (view === 'favorites') currentViewTitle.textContent = 'Favorites';
-            else if (view === 'shared') currentViewTitle.textContent = 'Shared';
-
-            renderFilteredFiles();
+            if (view === 'all' || view === 'files') {
+                currentViewTitle.textContent = 'All Files';
+                renderFilteredFiles();
+            } else if (view === 'favorites') {
+                currentViewTitle.textContent = 'Favorites';
+                renderFilteredFiles();
+            } else if (view === 'shared') {
+                currentViewTitle.textContent = 'Shared with Me';
+                await loadSharedFiles();
+            }
         });
     });
 
-    // --- CONTEXT MENU LOGIC ---
-    // 1. Intercept Right-Click on Table Rows
+    // Context Menu Logic
     ui.fileList.addEventListener('contextmenu', (e) => {
+        if (currentView === 'shared') return; // Disable context menu on shared view for simplicity
         const row = e.target.closest('tr');
         if (!row) return;
-        
-        e.preventDefault(); // Stop default browser menu
+        e.preventDefault();
         selectedFileName = row.querySelector('td:first-child').textContent.trim();
-        
-        // Position menu
         contextMenu.style.left = `${e.clientX}px`;
         contextMenu.style.top = `${e.clientY}px`;
         contextMenu.classList.remove('hidden');
     });
 
-    // 2. Hide menu on outside click
     document.addEventListener('click', (e) => {
-        if (!contextMenu.contains(e.target)) {
-            contextMenu.classList.add('hidden');
-        }
+        if (!contextMenu.contains(e.target)) contextMenu.classList.add('hidden');
     });
 
-    // 3. Handle Context Menu Actions
     contextMenu.addEventListener('click', async (e) => {
         const btn = e.target.closest('button');
         if (!btn) return;
-        
         const action = btn.dataset.action;
         contextMenu.classList.add('hidden');
 
@@ -106,7 +107,6 @@ export function initStorageEvents() {
         else if (action === 'rename') await renameFile(selectedFileName);
     });
 
-    // Standard Left-Click Actions (Fallback)
     ui.fileList.addEventListener('click', async (e) => {
         const target = e.target.closest('button');
         if (!target) return;
@@ -115,6 +115,15 @@ export function initStorageEvents() {
         if (action === 'download') await downloadFile(fileName);
         else if (action === 'delete') await deleteFile(fileName);
     });
+
+    // Clear notifications
+    const clearBtn = document.getElementById('clear-notifications');
+    if (clearBtn) {
+        clearBtn.addEventListener('click', () => {
+            document.getElementById('notification-list').innerHTML = '<div class="notification-empty">No new notifications</div>';
+            document.getElementById('notification-badge').classList.add('hidden');
+        });
+    }
 }
 
 export async function loadFiles() {
@@ -122,18 +131,65 @@ export async function loadFiles() {
     if (!user) return;
 
     const { data, error } = await db.storage.from(BUCKET_NAME).list(user.id);
-    
     if (error || !data) {
         allFilesCache = [];
         renderFilteredFiles();
         updateStorageOverview([]);
         return;
     }
-
     allFilesCache = data;
     renderFilteredFiles();
     updateStorageOverview(data);
 }
+
+async function loadSharedFiles() {
+    const { data: { user } } = await db.auth.getUser();
+    if (!user) return;
+
+    const { data, error } = await db.from('shared_files').select('*').eq('shared_with_email', user.email);
+    if (error || !data) {
+        sharedFilesCache = [];
+    } else {
+        sharedFilesCache = data;
+    }
+    renderSharedFiles();
+}
+
+function renderSharedFiles() {
+    if (!ui.fileList) return;
+    ui.fileList.innerHTML = '';
+    
+    if (!sharedFilesCache || sharedFilesCache.length === 0) {
+        ui.fileList.innerHTML = '<tr><td colspan="4" style="text-align:center; color: var(--muted-color); padding: 32px;">No files have been shared with you.</td></tr>';
+        document.getElementById('file-count').textContent = '0 files';
+        return;
+    }
+
+    sharedFilesCache.forEach(file => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td style="font-weight: 500;">${file.file_name} <span style="font-size:12px; color:var(--muted-color); font-weight:400;">(Shared by ${file.owner_id.slice(0,8)}...)</span></td>
+            <td>-</td>
+            <td style="color: var(--muted-color);">${new Date(file.created_at).toLocaleDateString()}</td>
+            <td>
+                <button class="action-link" onclick="window.downloadSharedFile('${file.file_path}', '${file.file_name}')">Download</button>
+            </td>
+        `;
+        ui.fileList.appendChild(row);
+    });
+    document.getElementById('file-count').textContent = `${sharedFilesCache.length} files`;
+}
+
+window.downloadSharedFile = async (filePath, fileName) => {
+    notifications.showLoading(`Downloading ${fileName}...`);
+    const { data } = db.storage.from(BUCKET_NAME).getPublicUrl(filePath);
+    window.open(data.publicUrl, '_blank');
+    notifications.hideLoading();
+    notifications.add(`Downloaded ${fileName}`, 'success');
+    
+    // Log access (Optional: requires backend function for true security, but UI notification works)
+    notifications.add(`File accessed: ${fileName}`, 'info');
+};
 
 function sortFiles(files) {
     const sorted = [...files];
@@ -143,8 +199,7 @@ function sortFiles(files) {
         case 'size-desc': return sorted.sort((a, b) => (b.metadata?.size || 0) - (a.metadata?.size || 0));
         case 'size-asc': return sorted.sort((a, b) => (a.metadata?.size || 0) - (b.metadata?.size || 0));
         case 'date-asc': return sorted.sort((a, b) => new Date(a.updated_at) - new Date(b.updated_at));
-        case 'date-desc': 
-        default: return sorted.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+        case 'date-desc': default: return sorted.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
     }
 }
 
@@ -152,8 +207,10 @@ function renderFilteredFiles() {
     let filesToShow = [...allFilesCache];
     const searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
 
-    if (currentView === 'favorites') filesToShow = []; 
-    else if (currentView === 'shared') filesToShow = [];
+    if (currentView === 'favorites') {
+        const favorites = JSON.parse(localStorage.getItem('47cloud_favorites') || '[]');
+        filesToShow = filesToShow.filter(file => favorites.includes(file.name));
+    }
 
     if (currentFilter !== 'all') {
         filesToShow = filesToShow.filter(file => {
@@ -170,15 +227,12 @@ function renderFilteredFiles() {
 
     filesToShow = sortFiles(filesToShow);
     ui.renderFiles(filesToShow);
-    
-    const countEl = document.getElementById('file-count');
-    if (countEl) countEl.textContent = `${filesToShow.length} files`;
+    document.getElementById('file-count').textContent = `${filesToShow.length} files`;
 }
 
 function updateStorageOverview(files) {
     let totalBytes = 0;
     const types = { Images: 0, Documents: 0, Videos: 0, Others: 0 };
-
     files.forEach(file => {
         totalBytes += file.metadata?.size || 0;
         const ext = file.name.split('.').pop().toLowerCase();
@@ -204,31 +258,51 @@ function updateStorageOverview(files) {
 }
 
 async function downloadFile(fileName) {
+    notifications.showLoading(`Preparing download for ${fileName}...`);
     const { data: { user } } = await db.auth.getUser();
     const filePath = `${user.id}/${fileName}`;
     const { data } = db.storage.from(BUCKET_NAME).getPublicUrl(filePath);
     window.open(data.publicUrl, '_blank');
+    notifications.hideLoading();
+    notifications.add(`Downloaded ${fileName}`, 'success');
 }
 
 async function deleteFile(fileName) {
     if (!confirm(`Are you sure you want to delete ${fileName}?`)) return;
+    notifications.showLoading(`Deleting ${fileName}...`);
     const { data: { user } } = await db.auth.getUser();
     const filePath = `${user.id}/${fileName}`;
     const { error } = await db.storage.from(BUCKET_NAME).remove([filePath]);
-    if (!error) loadFiles();
+    notifications.hideLoading();
+    if (!error) {
+        notifications.add(`${fileName} deleted.`, 'success');
+        loadFiles();
+    }
 }
 
 async function shareFile(fileName) {
+    const targetEmail = prompt(`Enter the email address to share "${fileName}" with:`);
+    if (!targetEmail || !targetEmail.includes('@')) {
+        notifications.add('Invalid email address. Share cancelled.', 'error');
+        return;
+    }
+
+    notifications.showLoading('Sharing file...');
     const { data: { user } } = await db.auth.getUser();
     const filePath = `${user.id}/${fileName}`;
-    const { data } = db.storage.from(BUCKET_NAME).getPublicUrl(filePath);
-    
-    try {
-        await navigator.clipboard.writeText(data.publicUrl);
-        ui.showUploadStatus('Link copied to clipboard!');
-        setTimeout(() => ui.showUploadStatus(''), 3000);
-    } catch (err) {
-        ui.showUploadStatus('Failed to copy link.');
+
+    const { error } = await db.from('shared_files').insert({
+        owner_id: user.id,
+        shared_with_email: targetEmail,
+        file_name: fileName,
+        file_path: filePath
+    });
+
+    notifications.hideLoading();
+    if (error) {
+        notifications.add(`Failed to share: ${error.message}`, 'error');
+    } else {
+        notifications.add(`Successfully shared ${fileName} with ${targetEmail}`, 'success');
     }
 }
 
@@ -236,26 +310,30 @@ async function renameFile(oldName) {
     const newName = prompt('Enter new file name:', oldName);
     if (!newName || newName === oldName) return;
 
+    notifications.showLoading('Renaming file...');
     const { data: { user } } = await db.auth.getUser();
     const oldPath = `${user.id}/${oldName}`;
     const newPath = `${user.id}/${newName}`;
 
-    // Supabase doesn't have a direct "rename", so we copy then delete
     const { data: fileData } = await db.storage.from(BUCKET_NAME).download(oldPath);
     if (!fileData) {
-        ui.showUploadStatus('Error fetching file for rename.');
+        notifications.hideLoading();
+        notifications.add('Error fetching file for rename.', 'error');
         return;
     }
 
     const { error: uploadError } = await db.storage.from(BUCKET_NAME).upload(newPath, fileData, { upsert: true });
     if (uploadError) {
-        ui.showUploadStatus(`Rename error: ${uploadError.message}`);
+        notifications.hideLoading();
+        notifications.add(`Rename error: ${uploadError.message}`, 'error');
         return;
     }
 
     const { error: deleteError } = await db.storage.from(BUCKET_NAME).remove([oldPath]);
+    notifications.hideLoading();
+    
     if (!deleteError) {
-        ui.showUploadStatus('File renamed successfully.');
+        notifications.add(`Renamed to ${newName}`, 'success');
         loadFiles();
     }
 }
