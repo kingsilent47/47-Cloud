@@ -182,3 +182,42 @@ VISUAL IMPROVEMENTS
 .dark #files-table tbody tr:hover {
     background-color: #262626;
 }
+/* =========================================
+CONTEXT MENU
+========================================= */
+.context-menu {
+    position: fixed;
+    background: #ffffff;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    z-index: 1000;
+    min-width: 180px;
+    padding: 4px 0;
+}
+
+.context-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 10px 16px;
+    background: none;
+    border: none;
+    color: var(--text-color);
+    font-size: 14px;
+    cursor: pointer;
+    border-radius: 0;
+}
+
+.context-item:hover {
+    background: #f8fafc;
+}
+
+.context-item.danger {
+    color: var(--danger-color);
+}
+
+.context-divider {
+    height: 1px;
+    background: var(--border-color);
+    margin: 4px 0;
+}
