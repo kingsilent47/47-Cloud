@@ -119,3 +119,38 @@ tr:last-child td { border-bottom: none; }
     .dashboard-grid { grid-template-columns: 1fr; }
     .overview-stats { grid-template-columns: repeat(2, 1fr); }
 }
+/* Sort Dropdown Styles */
+.topbar-controls {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.sort-select {
+    padding: 10px 16px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+    border-radius: 0; /* Sharp corners */
+    cursor: pointer;
+    transition: border-color 0.1s;
+}
+
+.sort-select:hover {
+    border-color: var(--text);
+}
+
+.sort-select:focus {
+    border-color: var(--text);
+}
+
+/* Adjust topbar for the new controls */
+.topbar { 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center; 
+    margin-bottom: 32px; 
+}
