@@ -221,3 +221,89 @@ CONTEXT MENU
     background: var(--border-color);
     margin: 4px 0;
 }
+/* =========================================
+SETTINGS PAGE
+========================================= */
+.settings-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 32px;
+}
+
+.back-btn {
+    background: none;
+    border: none;
+    color: var(--muted-color);
+    font-size: 14px;
+    cursor: pointer;
+    padding: 0;
+    border-radius: 0;
+}
+
+.back-btn:hover {
+    color: var(--text-color);
+}
+
+.settings-card {
+    background: var(--bg-color);
+    border: 1px solid var(--border-color);
+    padding: 32px;
+    margin-bottom: 24px;
+    border-radius: 0;
+}
+
+.settings-card h3 {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.form-group {
+    margin-bottom: 24px;
+}
+
+.form-group label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 8px;
+    color: var(--muted-color);
+}
+
+.form-group input {
+    width: 100%;
+    max-width: 400px;
+    padding: 10px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 0;
+    font-size: 14px;
+    background: var(--bg-color);
+    color: var(--text-color);
+}
+
+.form-group input:focus {
+    outline: 2px solid var(--text-color);
+    outline-offset: -1px;
+}
+
+.readonly-input {
+    background: #f8fafc !important;
+    color: var(--muted-color) !important;
+    cursor: not-allowed;
+}
+
+.form-hint {
+    font-size: 12px;
+    color: var(--muted-color);
+    margin-top: 8px;
+}
+
+.message {
+    margin-top: 16px;
+    font-size: 14px;
+}
