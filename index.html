@@ -98,6 +98,10 @@
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
                         <span id="notification-badge" class="notification-badge hidden">0</span>
                     </button>
+                    <button id="new-folder-btn" class="secondary-btn">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path><line x1="12" y1="11" x2="12" y2="17"></line><line x1="9" y1="14" x2="15" y2="14"></line></svg>
+                        New Folder
+                    </button>
                     <button id="upload-btn" class="primary-btn">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
                         Upload File
@@ -158,7 +162,7 @@
                     <h2>Quick Actions</h2>
                     <div class="actions-list">
                         <button id="quick-upload" class="action-btn">Upload Files</button>
-                        <button class="action-btn disabled">Create Folder</button>
+                        <button id="quick-new-folder" class="action-btn">Create Folder</button>
                         <button class="action-btn disabled">Share Link</button>
                     </div>
                 </section>
@@ -167,6 +171,10 @@
                         <h2 id="current-view-title">All Files</h2>
                         <span class="file-count" id="file-count">0 files</span>
                     </div>
+                    
+                    <!-- Breadcrumbs -->
+                    <div id="breadcrumbs" class="breadcrumbs hidden"></div>
+
                     <div class="filter-tabs" id="filter-tabs">
                         <button class="filter-btn active" data-filter="all">All</button>
                         <button class="filter-btn" data-filter="documents">Documents</button>
@@ -194,6 +202,7 @@
 
     <!-- Custom Context Menu -->
     <div id="context-menu" class="context-menu hidden">
+        <button class="context-item" data-action="open">Open</button>
         <button class="context-item" data-action="rename">Rename</button>
         <button class="context-item" data-action="download">Download</button>
         <button class="context-item" data-action="share">Share with User</button>
