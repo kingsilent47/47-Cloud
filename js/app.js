@@ -23,7 +23,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             e.preventDefault();
             if (dashboardGrid) dashboardGrid.classList.add('hidden');
             if (settingsView) settingsView.classList.remove('hidden');
-            loadUserSettings(); // Refresh email in case it changed
+            loadUserSettings();
         });
     }
 
@@ -65,6 +65,36 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         });
     }
+
+    // Mobile Menu Toggle Logic
+    const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
+    const sidebar = document.querySelector('.sidebar');
+    const sidebarOverlay = document.getElementById('sidebar-overlay');
+
+    if (mobileMenuToggle && sidebar) {
+        mobileMenuToggle.addEventListener('click', () => {
+            sidebar.classList.toggle('mobile-open');
+            if (sidebarOverlay) sidebarOverlay.classList.toggle('active');
+        });
+    }
+
+    if (sidebarOverlay && sidebar) {
+        sidebarOverlay.addEventListener('click', () => {
+            sidebar.classList.remove('mobile-open');
+            sidebarOverlay.classList.remove('active');
+        });
+    }
+
+    // Close menu when a nav item is clicked on mobile
+    const navItems = document.querySelectorAll('.sidebar-nav .nav-item');
+    navItems.forEach(item => {
+        item.addEventListener('click', () => {
+            if (window.innerWidth <= 768) {
+                sidebar.classList.remove('mobile-open');
+                if (sidebarOverlay) sidebarOverlay.classList.remove('active');
+            }
+        });
+    });
 });
 
 async function loadUserSettings() {
