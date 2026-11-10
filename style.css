@@ -154,3 +154,31 @@ tr:last-child td { border-bottom: none; }
     align-items: center; 
     margin-bottom: 32px; 
 }
+/* =========================================
+VISUAL IMPROVEMENTS
+========================================= */
+/* Custom Sharp Scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+::-webkit-scrollbar-track {
+    background: var(--bg);
+}
+::-webkit-scrollbar-thumb {
+    background: var(--border);
+}
+::-webkit-scrollbar-thumb:hover {
+    background: var(--muted);
+}
+
+/* Strict Table Row Hover Effects */
+#files-table tbody tr {
+    transition: background-color 0.1s ease;
+}
+#files-table tbody tr:hover {
+    background-color: #f8fafc;
+}
+.dark #files-table tbody tr:hover {
+    background-color: #262626;
+}
