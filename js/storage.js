@@ -176,7 +176,7 @@ export function initStorageEvents() {
     }
 }
 
-async function loadDirectory() {
+export async function loadDirectory() {
     const { data: { user } } = await db.auth.getUser();
     if (!user) return;
 
