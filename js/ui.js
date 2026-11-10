@@ -32,12 +32,12 @@ export const ui = {
         if (uploadStatus) uploadStatus.textContent = text;
     },
     
-    renderFiles: (files) => {
+    renderFiles: (files, favorites = []) => {
         if (!fileList) return;
         fileList.innerHTML = '';
         
         if (!files || files.length === 0) {
-            fileList.innerHTML = '<tr><td colspan="4" style="text-align:center; color: var(--muted); padding: 32px;">No files uploaded yet.</td></tr>';
+            fileList.innerHTML = '<tr><td colspan="4" style="text-align:center; color: var(--muted); padding: 32px;">No files found.</td></tr>';
             return;
         }
 
@@ -45,9 +45,15 @@ export const ui = {
             const row = document.createElement('tr');
             const sizeKB = file.metadata ? (file.metadata.size / 1024).toFixed(1) : '0.0';
             const date = file.updated_at ? new Date(file.updated_at).toLocaleDateString() : 'Unknown';
+            const isFav = favorites.includes(file.name);
             
             row.innerHTML = `
-                <td style="font-weight: 500;">${file.name}</td>
+                <td style="font-weight: 500; display: flex; align-items: center; gap: 8px;">
+                    <button class="action-link" data-action="favorite" data-name="${file.name}" style="color: ${isFav ? '#eab308' : 'var(--muted)'}; font-size: 18px; line-height: 1; padding: 0;" aria-label="Toggle favorite">
+                        ${isFav ? '★' : '☆'}
+                    </button>
+                    ${file.name}
+                </td>
                 <td>${sizeKB} KB</td>
                 <td style="color: var(--muted);">${date}</td>
                 <td>
