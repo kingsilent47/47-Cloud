@@ -307,3 +307,137 @@ SETTINGS PAGE
     margin-top: 16px;
     font-size: 14px;
 }
+/* =========================================
+RESPONSIVE MOBILE REFINEMENT
+========================================= */
+
+/* Mobile Menu Button (Hidden on Desktop) */
+.mobile-menu-btn {
+    display: none;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 8px;
+    margin-right: 12px;
+    color: var(--text-color);
+}
+
+/* Mobile Styles */
+@media (max-width: 768px) {
+    /* Show Menu Button */
+    .mobile-menu-btn {
+        display: block;
+    }
+
+    /* Sidebar becomes an overlay */
+    .sidebar {
+        position: fixed;
+        top: 0;
+        left: -100%; /* Hidden by default */
+        width: 280px;
+        height: 100vh;
+        z-index: 2000;
+        transition: left 0.3s ease;
+        box-shadow: 2px 0 12px rgba(0,0,0,0.1);
+    }
+
+    .sidebar.mobile-open {
+        left: 0; /* Slide in */
+    }
+
+    /* Overlay backdrop when menu is open */
+    .sidebar-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.5);
+        z-index: 1999;
+    }
+    
+    .sidebar-overlay.active {
+        display: block;
+    }
+
+    /* Main content takes full width */
+    .main-content {
+        padding: 16px;
+        width: 100%;
+    }
+
+    /* Stack Topbar controls */
+    .topbar-controls {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+        width: 100%;
+    }
+
+    .search-bar {
+        width: 100%;
+    }
+
+    .sort-select {
+        width: 100%;
+    }
+
+    .topbar-actions {
+        width: 100%;
+    }
+
+    .primary-btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    /* Stack Dashboard Grid */
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+
+    /* Overview Stats: 2 columns instead of 4 */
+    .overview-stats {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+    }
+
+    .stat-value {
+        font-size: 18px;
+    }
+
+    /* Hide Quick Actions on very small screens or stack them */
+    .actions-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    /* Table Scroll */
+    .table-container {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch; /* Smooth scroll on iOS */
+    }
+
+    table {
+        min-width: 600px; /* Force scroll on small screens */
+    }
+
+    /* Filter Tabs: Horizontal Scroll */
+    .filter-tabs {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        padding-bottom: 4px;
+    }
+    
+    .filter-btn {
+        white-space: nowrap;
+        margin-right: 4px;
+    }
+}
+
+/* Desktop Reset */
+@media (min-width: 769px) {
+    .sidebar-overlay {
+        display: none !important;
+    }
+}
