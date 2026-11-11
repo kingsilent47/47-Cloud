@@ -41,7 +41,7 @@ export function initStorageEvents() {
 
         try {
             // 1. Get Presigned URL from Netlify Function
-            const presignRes = await fetch('/.netlify/functions/r2-presign', {
+                const presignRes = await fetch('/.netlify/functions/r2-presign', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -51,6 +51,13 @@ export function initStorageEvents() {
                     folderId: currentFolderId
                 })
             });
+
+            // Check if the function returned an error
+            if (!presignRes.ok) {
+                const errData = await presignRes.json();
+                throw new Error(errData.error || 'Netlify function failed');
+            }
+
             const { url, key } = await presignRes.json();
 
             // 2. Upload directly to Cloudflare R2
