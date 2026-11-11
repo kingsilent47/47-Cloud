@@ -2,6 +2,7 @@ import {
     S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand,
     DeleteObjectsCommand, CopyObjectCommand, ListObjectsV2Command
 } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 const SUPABASE_URL = (process.env.SUPABASE_URL || "").trim();
 const SUPABASE_ANON_KEY = (process.env.SUPABASE_ANON_KEY || "").trim();
@@ -9,7 +10,6 @@ const R2_ACCOUNT_ID = (process.env.R2_ACCOUNT_ID || "").trim();
 const R2_ACCESS_KEY_ID = (process.env.R2_ACCESS_KEY_ID || "").trim();
 const R2_SECRET_ACCESS_KEY = (process.env.R2_SECRET_ACCESS_KEY || "").trim();
 const R2_BUCKET_NAME = (process.env.R2_BUCKET_NAME || "").trim();
-const MAX_BYTES = Math.floor(4.5 * 1024 * 1024);
 
 function makeClient() {
     return new S3Client({
@@ -77,7 +77,7 @@ export async function handler(event) {
         return { statusCode: 401, body: JSON.stringify({ error: "Not authenticated" }) };
     }
 
-    const { action, fileName, userId, folderId, newName, contentType, data } = payload;
+    const { action, fileName, userId, folderId, newName } = payload;
     if (!action || !userId) {
         return { statusCode: 400, body: JSON.stringify({ error: "Missing action or userId" }) };
     }
@@ -90,30 +90,20 @@ export async function handler(event) {
 
     try {
         if (action === "upload") {
-            if (!owns || !fileName || !data) return { statusCode: 400, body: JSON.stringify({ error: "Missing upload data" }) };
-            const buf = Buffer.from(data, "base64");
-            if (buf.length > MAX_BYTES) return { statusCode: 413, body: JSON.stringify({ error: "File exceeds the 4.5 MB transfer limit" }) };
-            await s3.send(new PutObjectCommand({
-                Bucket, Key: key, Body: buf,
-                ContentType: contentType || "application/octet-stream",
-            }));
-            return { statusCode: 200, body: JSON.stringify({ success: true, key }) };
+            if (!owns || !fileName) return { statusCode: 403, body: JSON.stringify({ error: "Forbidden" }) };
+            const url = await getSignedUrl(s3, new PutObjectCommand({ Bucket, Key: key }), { expiresIn: 21600 });
+            return { statusCode: 200, body: JSON.stringify({ url, key, method: "PUT" }) };
         }
 
         if (action === "download") {
             if (!fileName) return { statusCode: 400, body: JSON.stringify({ error: "Missing fileName" }) };
             const allowed = owns || await isSharedWith(caller, userId, fileName, folderId || null, token);
             if (!allowed) return { statusCode: 403, body: JSON.stringify({ error: "Forbidden" }) };
-            const obj = await s3.send(new GetObjectCommand({ Bucket, Key: key }));
-            const bytes = await obj.Body.transformToByteArray();
-            if (bytes.length > MAX_BYTES) return { statusCode: 413, body: JSON.stringify({ error: "File exceeds the 4.5 MB transfer limit" }) };
-            return {
-                statusCode: 200,
-                body: JSON.stringify({
-                    data: Buffer.from(bytes).toString("base64"),
-                    contentType: obj.ContentType || "application/octet-stream",
-                }),
-            };
+            const url = await getSignedUrl(s3, new GetObjectCommand({
+                Bucket, Key: key,
+                ResponseContentDisposition: `attachment; filename*=UTF-8''${encodeURIComponent(fileName)}`,
+            }), { expiresIn: 3600 });
+            return { statusCode: 200, body: JSON.stringify({ url, method: "GET" }) };
         }
 
         if (action === "delete") {
