@@ -51,6 +51,20 @@ async function r2Error(res) {
     return new Error(`R2 ${res.status}${code ? ` ${code}` : ''}${message ? `: ${message}` : ''}`);
 }
 
+async function fetchAndSave(url, fileName) {
+    const res = await fetch(url, { method: 'GET' });
+    if (!res.ok) throw await r2Error(res);
+    const blob = await res.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = objectUrl;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+}
+
 const favKey = () => `47cloud_favorites_${currentUserId}`;
 const loadFavorites = () => {
     try { favoritesCache = JSON.parse(localStorage.getItem(favKey()) || '[]'); }
@@ -390,7 +404,7 @@ async function downloadShared(fileName, ownerId, folderId) {
         const { url } = await api('/.netlify/functions/r2-presign', {
             action: 'download', fileName, userId: ownerId, folderId: folderId || null
         });
-        window.open(url, '_blank');
+        await fetchAndSave(url, fileName);
         notifications.hideLoading();
         notifications.add(`Downloaded ${fileName}`, 'success');
     } catch (error) {
@@ -523,7 +537,7 @@ async function downloadFile(fileName) {
         const { url } = await api('/.netlify/functions/r2-presign', {
             action: 'download', fileName, userId: user.id, folderId: currentFolderId
         });
-        window.open(url, '_blank');
+        await fetchAndSave(url, fileName);
         notifications.hideLoading();
         notifications.add(`Downloaded ${fileName}`, 'success');
     } catch (error) {
