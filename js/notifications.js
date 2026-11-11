@@ -20,9 +20,25 @@ export const notifications = {
         }
 
         // Close dropdown on outside click
-        document.addEventListener('click', () => {
-            if (notifications.dropdown) notifications.dropdown.classList.add('hidden');
+        document.addEventListener('click', (e) => {
+            if (notifications.dropdown && !notifications.dropdown.contains(e.target) && e.target.id !== 'notification-bell') {
+                notifications.dropdown.classList.add('hidden');
+            }
         });
+
+        // Clear All Button Logic
+        const clearBtn = document.getElementById('clear-notifications');
+        if (clearBtn) {
+            clearBtn.addEventListener('click', () => {
+                if (notifications.list) {
+                    notifications.list.innerHTML = '<div class="notification-empty">No new notifications</div>';
+                }
+                if (notifications.badge) {
+                    notifications.badge.classList.add('hidden');
+                    notifications.badge.textContent = '0';
+                }
+            });
+        }
     },
 
     showLoading: (message = 'Processing...') => {
@@ -41,6 +57,10 @@ export const notifications = {
     add: (message, type = 'info') => {
         if (!notifications.list) return;
 
+        // Remove "empty" message if it exists
+        const emptyMsg = notifications.list.querySelector('.notification-empty');
+        if (emptyMsg) emptyMsg.remove();
+
         const item = document.createElement('div');
         item.className = `notification-item ${type}`;
         
@@ -49,19 +69,13 @@ export const notifications = {
         
         notifications.list.prepend(item);
         
-        // Update badge
+        // Update badge count
         const count = notifications.list.children.length;
         if (notifications.badge) {
             notifications.badge.textContent = count;
             notifications.badge.classList.remove('hidden');
         }
-
-        // Auto-hide after 5 seconds
-        setTimeout(() => {
-            item.remove();
-            if (notifications.list.children.length === 0 && notifications.badge) {
-                notifications.badge.classList.add('hidden');
-            }
-        }, 5000);
+        
+        // NO AUTO-DISMISS: Notifications stay until cleared manually.
     }
 };
