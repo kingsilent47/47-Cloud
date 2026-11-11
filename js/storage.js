@@ -2,6 +2,8 @@ import { db } from './config.js';
 import { ui } from './ui.js';
 import { notifications } from './notifications.js';
 
+const MAX_BYTES = Math.floor(4.5 * 1024 * 1024);
+
 const fileInput = document.getElementById('file-input');
 const uploadBtn = document.getElementById('upload-btn');
 const quickUploadBtn = document.getElementById('quick-upload');
@@ -44,17 +46,24 @@ async function api(path, body) {
     return json;
 }
 
-async function r2Error(res) {
-    const text = await res.text().catch(() => '');
-    const code = (text.match(/<Code>([^<]+)<\/Code>/) || [])[1];
-    const message = (text.match(/<Message>([^<]+)<\/Message>/) || [])[1];
-    return new Error(`R2 ${res.status}${code ? ` ${code}` : ''}${message ? `: ${message}` : ''}`);
+async function fileToBase64(file) {
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    let binary = '';
+    const chunk = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunk) {
+        binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+    }
+    return btoa(binary);
 }
 
-async function fetchAndSave(url, fileName) {
-    const res = await fetch(url, { method: 'GET' });
-    if (!res.ok) throw await r2Error(res);
-    const blob = await res.blob();
+function base64ToBlob(data, contentType) {
+    const binary = atob(data);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return new Blob([bytes], { type: contentType || 'application/octet-stream' });
+}
+
+function saveBlob(blob, fileName) {
     const objectUrl = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = objectUrl;
@@ -91,23 +100,24 @@ export function initStorageEvents() {
         const file = fileInput.files[0];
         if (!file) return;
 
-        notifications.showLoading(`Preparing upload for ${file.name}...`);
+        if (file.size > MAX_BYTES) {
+            notifications.add(`${file.name} is larger than the 4.5 MB transfer limit.`, 'error');
+            fileInput.value = '';
+            return;
+        }
+
+        notifications.showLoading(`Uploading ${file.name}...`);
         try {
             const { data: { user } } = await db.auth.getUser();
-            const { url } = await api('/.netlify/functions/r2-presign', {
+            const data = await fileToBase64(file);
+            await api('/.netlify/functions/r2-presign', {
                 action: 'upload',
                 fileName: file.name,
                 userId: user.id,
                 folderId: currentFolderId,
-                contentType: file.type || null
+                contentType: file.type || null,
+                data
             });
-
-            notifications.showLoading(`Uploading ${file.name}...`);
-            const headers = {};
-            if (file.type) headers['Content-Type'] = file.type;
-            const uploadRes = await fetch(url, { method: 'PUT', body: file, headers });
-            if (!uploadRes.ok) throw await r2Error(uploadRes);
-
             notifications.hideLoading();
             notifications.add(`${file.name} uploaded successfully.`, 'success');
             loadDirectory();
@@ -399,12 +409,12 @@ function renderSharedFiles() {
 }
 
 async function downloadShared(fileName, ownerId, folderId) {
-    notifications.showLoading(`Preparing download for ${fileName}...`);
+    notifications.showLoading(`Downloading ${fileName}...`);
     try {
-        const { url } = await api('/.netlify/functions/r2-presign', {
+        const { data, contentType } = await api('/.netlify/functions/r2-presign', {
             action: 'download', fileName, userId: ownerId, folderId: folderId || null
         });
-        await fetchAndSave(url, fileName);
+        saveBlob(base64ToBlob(data, contentType), fileName);
         notifications.hideLoading();
         notifications.add(`Downloaded ${fileName}`, 'success');
     } catch (error) {
@@ -531,13 +541,13 @@ function updateStorageOverview(files) {
 }
 
 async function downloadFile(fileName) {
-    notifications.showLoading(`Preparing download for ${fileName}...`);
+    notifications.showLoading(`Downloading ${fileName}...`);
     try {
         const { data: { user } } = await db.auth.getUser();
-        const { url } = await api('/.netlify/functions/r2-presign', {
+        const { data, contentType } = await api('/.netlify/functions/r2-presign', {
             action: 'download', fileName, userId: user.id, folderId: currentFolderId
         });
-        await fetchAndSave(url, fileName);
+        saveBlob(base64ToBlob(data, contentType), fileName);
         notifications.hideLoading();
         notifications.add(`Downloaded ${fileName}`, 'success');
     } catch (error) {
