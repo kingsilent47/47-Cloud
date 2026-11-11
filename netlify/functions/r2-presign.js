@@ -94,7 +94,7 @@ export async function handler(event) {
             const command = new PutObjectCommand({ Bucket, Key: key });
             if (contentType) command.input.ContentType = contentType;
             const url = await getSignedUrl(s3, command, { expiresIn: 3600 });
-            return { statusCode: 200, body: JSON.stringify({ url, key }) };
+            return { statusCode: 200, body: JSON.stringify({ url, key, method: "PUT" }) };
         }
 
         if (action === "download") {
@@ -102,7 +102,7 @@ export async function handler(event) {
             const allowed = owns || await isSharedWith(caller, userId, fileName, folderId || null, token);
             if (!allowed) return { statusCode: 403, body: JSON.stringify({ error: "Forbidden" }) };
             const url = await getSignedUrl(s3, new GetObjectCommand({ Bucket, Key: key }), { expiresIn: 3600 });
-            return { statusCode: 200, body: JSON.stringify({ url }) };
+            return { statusCode: 200, body: JSON.stringify({ url, method: "GET" }) };
         }
 
         if (action === "delete") {
