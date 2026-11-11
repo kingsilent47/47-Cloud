@@ -1,11 +1,21 @@
 import { S3Client, ListObjectsV2Command } from "@aws-sdk/client-s3";
 
-export async function handler(event, context) {
+export async function handler(event) {
     if (event.httpMethod !== "POST") {
-        return { statusCode: 405, body: "Method Not Allowed" }
+        return { statusCode: 405, body: JSON.stringify({ error: "Method Not Allowed" }) };
     }
 
-    const { prefix } = JSON.parse(event.body);
+    let payload;
+    try {
+        payload = JSON.parse(event.body || "{}");
+    } catch {
+        return { statusCode: 400, body: JSON.stringify({ error: "Invalid JSON body" }) };
+    }
+
+    const { prefix } = payload;
+    if (!prefix) {
+        return { statusCode: 400, body: JSON.stringify({ error: "Missing prefix" }) };
+    }
 
     const s3 = new S3Client({
         region: "auto",
@@ -14,22 +24,24 @@ export async function handler(event, context) {
             accessKeyId: process.env.R2_ACCESS_KEY_ID,
             secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
         },
+        requestChecksumCalculation: "WHEN_REQUIRED",
+        responseChecksumValidation: "WHEN_REQUIRED",
     });
 
     try {
-        const command = new ListObjectsV2Command({
+        const response = await s3.send(new ListObjectsV2Command({
             Bucket: process.env.R2_BUCKET_NAME,
             Prefix: prefix,
-            Delimiter: "/", // This ensures we only get files in this specific "folder", not subfolders
-        });
-        const response = await s3.send(command);
-        
-        // Format to match what the frontend expects
-        const contents = (response.Contents || []).map(item => ({
-            name: item.Key.split('/').pop(),
-            size: item.Size,
-            lastModified: item.LastModified
+            Delimiter: "/",
         }));
+
+        const contents = (response.Contents || [])
+            .filter(item => item.Key !== prefix)
+            .map(item => ({
+                name: item.Key.split("/").pop(),
+                size: item.Size,
+                lastModified: item.LastModified,
+            }));
 
         return { statusCode: 200, body: JSON.stringify({ contents }) };
     } catch (error) {
