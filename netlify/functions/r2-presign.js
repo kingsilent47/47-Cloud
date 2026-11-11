@@ -11,17 +11,17 @@ export async function handler(event, context) {
 
     const s3 = new S3Client({
         region: "auto",
-        endpoint: `https://${process.env.a7d85b9d3208887d23e39c1862f8709a}.r2.cloudflarestorage.com`,
+        endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
         credentials: {
-            accessKeyId: process.env.92795e773d989c11f9c40fc22ee1acc0,
-            secretAccessKey: process.env.8c3824a487077500c4d66b841a54a75e416bd53376c0a78bc9a056dfccf4aa96,
+            accessKeyId: process.env.R2_ACCESS_KEY_ID,
+            secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
         },
     });
 
     try {
         if (action === 'upload') {
             const command = new PutObjectCommand({
-                Bucket: process.env.47-cloud-storage,
+                Bucket: process.env.R2_BUCKET_NAME,
                 Key: objectKey,
             });
             const url = await getSignedUrl(s3, command, { expiresIn: 3600 });
@@ -30,7 +30,7 @@ export async function handler(event, context) {
         
         if (action === 'download') {
             const command = new GetObjectCommand({
-                Bucket: process.env.47-cloud-storage,
+                Bucket: process.env.R2_BUCKET_NAME,
                 Key: objectKey,
             });
             const url = await getSignedUrl(s3, command, { expiresIn: 3600 });
@@ -39,7 +39,7 @@ export async function handler(event, context) {
 
         if (action === 'delete') {
             const command = new DeleteObjectCommand({
-                Bucket: process.env.47-cloud-storage,
+                Bucket: process.env.R2_BUCKET_NAME,
                 Key: objectKey,
             });
             await s3.send(command);
