@@ -30,29 +30,21 @@ export async function handler(event) {
     });
 
     const objectKey = folderId ? `${userId}/${folderId}/${fileName}` : `${userId}/${fileName}`;
+    const Bucket = process.env.R2_BUCKET_NAME;
 
     try {
         if (action === "upload") {
-            const url = await getSignedUrl(s3, new PutObjectCommand({
-                Bucket: process.env.R2_BUCKET_NAME,
-                Key: objectKey,
-            }), { expiresIn: 3600 });
+            const url = await getSignedUrl(s3, new PutObjectCommand({ Bucket, Key: objectKey }), { expiresIn: 3600 });
             return { statusCode: 200, body: JSON.stringify({ url, key: objectKey }) };
         }
 
         if (action === "download") {
-            const url = await getSignedUrl(s3, new GetObjectCommand({
-                Bucket: process.env.R2_BUCKET_NAME,
-                Key: objectKey,
-            }), { expiresIn: 3600 });
+            const url = await getSignedUrl(s3, new GetObjectCommand({ Bucket, Key: objectKey }), { expiresIn: 3600 });
             return { statusCode: 200, body: JSON.stringify({ url }) };
         }
 
         if (action === "delete") {
-            await s3.send(new DeleteObjectCommand({
-                Bucket: process.env.R2_BUCKET_NAME,
-                Key: objectKey,
-            }));
+            await s3.send(new DeleteObjectCommand({ Bucket, Key: objectKey }));
             return { statusCode: 200, body: JSON.stringify({ success: true }) };
         }
 
