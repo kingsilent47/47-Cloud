@@ -9,8 +9,7 @@ export const notifications = {
         notifications.dropdown = document.getElementById('notification-dropdown');
         notifications.list = document.getElementById('notification-list');
         notifications.badge = document.getElementById('notification-badge');
-        
-        // Toggle dropdown
+
         const bellBtn = document.getElementById('notification-bell');
         if (bellBtn) {
             bellBtn.addEventListener('click', (e) => {
@@ -19,14 +18,12 @@ export const notifications = {
             });
         }
 
-        // Close dropdown on outside click
         document.addEventListener('click', (e) => {
-            if (notifications.dropdown && !notifications.dropdown.contains(e.target) && e.target.id !== 'notification-bell') {
+            if (notifications.dropdown && !notifications.dropdown.contains(e.target)) {
                 notifications.dropdown.classList.add('hidden');
             }
         });
 
-        // Clear All Button Logic
         const clearBtn = document.getElementById('clear-notifications');
         if (clearBtn) {
             clearBtn.addEventListener('click', () => {
@@ -49,33 +46,32 @@ export const notifications = {
     },
 
     hideLoading: () => {
-        if (notifications.overlay) {
-            notifications.overlay.classList.add('hidden');
-        }
+        if (notifications.overlay) notifications.overlay.classList.add('hidden');
     },
 
     add: (message, type = 'info') => {
         if (!notifications.list) return;
 
-        // Remove "empty" message if it exists
         const emptyMsg = notifications.list.querySelector('.notification-empty');
         if (emptyMsg) emptyMsg.remove();
 
         const item = document.createElement('div');
         item.className = `notification-item ${type}`;
-        
-        const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        item.innerHTML = `<p>${message}</p><span class="notification-time">${time}</span>`;
-        
+
+        const text = document.createElement('p');
+        text.textContent = message;
+
+        const time = document.createElement('span');
+        time.className = 'notification-time';
+        time.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+        item.appendChild(text);
+        item.appendChild(time);
         notifications.list.prepend(item);
-        
-        // Update badge count
-        const count = notifications.list.children.length;
+
         if (notifications.badge) {
-            notifications.badge.textContent = count;
+            notifications.badge.textContent = notifications.list.children.length;
             notifications.badge.classList.remove('hidden');
         }
-        
-        // NO AUTO-DISMISS: Notifications stay until cleared manually.
     }
 };
