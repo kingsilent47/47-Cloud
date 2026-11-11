@@ -44,6 +44,13 @@ async function api(path, body) {
     return json;
 }
 
+async function r2Error(res) {
+    const text = await res.text().catch(() => '');
+    const code = (text.match(/<Code>([^<]+)<\/Code>/) || [])[1];
+    const message = (text.match(/<Message>([^<]+)<\/Message>/) || [])[1];
+    return new Error(`R2 ${res.status}${code ? ` ${code}` : ''}${message ? `: ${message}` : ''}`);
+}
+
 const favKey = () => `47cloud_favorites_${currentUserId}`;
 const loadFavorites = () => {
     try { favoritesCache = JSON.parse(localStorage.getItem(favKey()) || '[]'); }
@@ -74,14 +81,18 @@ export function initStorageEvents() {
         try {
             const { data: { user } } = await db.auth.getUser();
             const { url } = await api('/.netlify/functions/r2-presign', {
-                action: 'upload', fileName: file.name, userId: user.id, folderId: currentFolderId
+                action: 'upload',
+                fileName: file.name,
+                userId: user.id,
+                folderId: currentFolderId,
+                contentType: file.type || null
             });
 
             notifications.showLoading(`Uploading ${file.name}...`);
             const headers = {};
             if (file.type) headers['Content-Type'] = file.type;
             const uploadRes = await fetch(url, { method: 'PUT', body: file, headers });
-            if (!uploadRes.ok) throw new Error(`R2 upload failed (${uploadRes.status})`);
+            if (!uploadRes.ok) throw await r2Error(uploadRes);
 
             notifications.hideLoading();
             notifications.add(`${file.name} uploaded successfully.`, 'success');
